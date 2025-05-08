@@ -2,13 +2,14 @@ import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
-
+from PIL import ImageGrab
+import io
 import requests
-from zeep import Client
+from zeep import Client, Transport
 
 # URLs
-API_REST_URL = "http://localhost:5099/retrotrack/api"
-API_SOAP_WSDL = "http://localhost:8085/RetroTrackSoapJava_war_exploded/api/user?wsdl"
+API_REST_URL = "https://localhost:9095/rest/api"
+API_SOAP_WSDL = "https://localhost:8095/soap/api/user?wsdl"
 
 # Datos cargados
 users = []
@@ -17,7 +18,12 @@ games = []
 def cargar_usuarios():
     global users
     try:
-        client = Client(API_SOAP_WSDL)
+        session = requests.Session()
+        session.verify = './certs/apiSoap.pem'
+
+        transport = Transport(session=session)
+        client = Client(API_SOAP_WSDL, transport=transport)
+
         users = client.service.listUsers()
         combo_users['values'] = users
     except Exception as e:
@@ -26,7 +32,7 @@ def cargar_usuarios():
 def cargar_juegos():
     global games
     try:
-        response = requests.get(f"{API_REST_URL}/Games")
+        response = requests.get(f"{API_REST_URL}/Games", verify='./certs/apiRest.pem')
         response.raise_for_status()
         games = response.json()
         combo_games['values'] = [g['title'] for g in games]
@@ -57,22 +63,31 @@ def enviar_sesion():
         messagebox.showerror("Error", "Formato de hora inválido. Usa HH:MM (24h).")
         return
 
-    game_id = games[game_index]['id']
-
     # Combinar fecha y hora
     played_at = datetime.datetime.combine(selected_date, hour_obj)
+    game_id = games[game_index]['id']
 
+    # Tomar captura de pantalla
+    screenshot = ImageGrab.grab()
+    buffer = io.BytesIO()
+    screenshot.save(buffer, format='PNG')
+    buffer.seek(0)
+
+    # Preparar datos
     data = {
         "playerId": username,
-        "gameId": game_id,
+        "gameId": str(game_id),
         "playedAt": played_at.isoformat(),
-        "minutesPlayed": minutes
+        "minutesPlayed": str(minutes)
+    }
+    files = {
+        "screenshot": ("screenshot.png", buffer, "image/png")
     }
 
     try:
-        response = requests.post(f"{API_REST_URL}/GameSessions", json=data)
+        response = requests.post(f"{API_REST_URL}/GameSessions", data=data, files=files, verify='./certs/apiRest.pem')
         if response.status_code in [200, 201]:
-            messagebox.showinfo("Éxito", "Sesión registrada correctamente.")
+            messagebox.showinfo("Éxito", "Sesión registrada con captura correctamente.")
         else:
             messagebox.showerror("Error", f"Error al registrar sesión: {response.status_code}\n{response.text}")
     except Exception as e:
@@ -106,8 +121,7 @@ entry_minutes.grid(row=2, column=1)
 
 label_date = tk.Label(frame_form, text="Fecha:")
 label_date.grid(row=3, column=0, sticky="e")
-date_entry = DateEntry(frame_form, width=12, background='darkblue',
-                       foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
+date_entry = DateEntry(frame_form, width=12, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
 date_entry.grid(row=3, column=1)
 
 label_hour = tk.Label(frame_form, text="Hora (HH:MM):")
@@ -121,5 +135,9 @@ btn_submit.pack(pady=20)
 # Cargar datos al iniciar
 cargar_juegos()
 cargar_usuarios()
+
+# Hora actual por defecto
+current_time = datetime.datetime.now().strftime("%H:%M")
+entry_hour.insert(0, current_time)
 
 root.mainloop()
