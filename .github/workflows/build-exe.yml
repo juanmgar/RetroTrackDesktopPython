@@ -1,4 +1,4 @@
-name: Build Python Executable
+name: Build and Release
 
 on:
   push:
@@ -27,8 +27,18 @@ jobs:
         run: |
           pyinstaller --onefile --windowed --add-data "certs;certs" RetrotrackDesktopPython.py
 
-      - name: Upload executable as artifact
-        uses: actions/upload-artifact@v4
+      - name: Get version
+        id: get_version
+        run: echo "version=$(date +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
         with:
-          name: retrotrack-exe
-          path: dist/*.exe
+          tag_name: nightly
+          name: Nightly Build
+          body: Automatic build from main branch
+          draft: false
+          prerelease: true
+          files: dist/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
