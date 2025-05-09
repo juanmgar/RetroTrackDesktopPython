@@ -1,0 +1,34 @@
+name: Build Python Executable
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller requests zeep pillow tkcalendar
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --add-data "certs;certs" RetrotrackDesktopPython.py
+
+      - name: Upload executable as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: retrotrack-exe
+          path: dist/*.exe
