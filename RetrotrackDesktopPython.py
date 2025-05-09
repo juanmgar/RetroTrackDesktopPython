@@ -1,9 +1,11 @@
+import sys
+import os
+import io
 import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 from PIL import ImageGrab
-import io
 import requests
 from zeep import Client, Transport
 
@@ -15,11 +17,15 @@ API_SOAP_WSDL = "https://localhost:8095/soap/api/user?wsdl"
 users = []
 games = []
 
+def get_resource_path(relative_path):
+    base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+    return os.path.join(base_path, relative_path)
+
 def cargar_usuarios():
     global users
     try:
         session = requests.Session()
-        session.verify = './certs/apiSoap.pem'
+        session.verify = get_resource_path('certs/apiSoap.pem')
 
         transport = Transport(session=session)
         client = Client(API_SOAP_WSDL, transport=transport)
@@ -32,7 +38,7 @@ def cargar_usuarios():
 def cargar_juegos():
     global games
     try:
-        response = requests.get(f"{API_REST_URL}/Games", verify='./certs/apiRest.pem')
+        response = requests.get(f"{API_REST_URL}/Games", verify=get_resource_path('certs/apiRest.pem'))
         response.raise_for_status()
         games = response.json()
         combo_games['values'] = [g['title'] for g in games]
@@ -85,7 +91,12 @@ def enviar_sesion():
     }
 
     try:
-        response = requests.post(f"{API_REST_URL}/GameSessions", data=data, files=files, verify='./certs/apiRest.pem')
+        response = requests.post(
+            f"{API_REST_URL}/GameSessions",
+            data=data,
+            files=files,
+            verify=get_resource_path('certs/apiRest.pem')
+        )
         if response.status_code in [200, 201]:
             messagebox.showinfo("Éxito", "Sesión registrada con captura correctamente.")
         else:
