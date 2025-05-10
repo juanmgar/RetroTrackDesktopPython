@@ -62,43 +62,39 @@ def enviar_sesion():
         messagebox.showerror("Error", "Los minutos deben ser un número.")
         return
 
-    # Validar formato hora (HH:MM)
     try:
         hour_obj = datetime.datetime.strptime(hour_text, "%H:%M").time()
     except ValueError:
         messagebox.showerror("Error", "Formato de hora inválido. Usa HH:MM (24h).")
         return
 
-    # Combinar fecha y hora
     played_at = datetime.datetime.combine(selected_date, hour_obj)
     game_id = games[game_index]['id']
 
-    # Tomar captura de pantalla
-    screenshot = ImageGrab.grab()
-    buffer = io.BytesIO()
-    screenshot.save(buffer, format='PNG')
-    buffer.seek(0)
-
-    # Preparar datos
     data = {
         "playerId": username,
         "gameId": str(game_id),
         "playedAt": played_at.isoformat(),
         "minutesPlayed": str(minutes)
     }
-    files = {
-        "screenshot": ("screenshot.png", buffer, "image/png")
-    }
+
+    files = {}
+    if send_screenshot_var.get():
+        screenshot = ImageGrab.grab()
+        buffer = io.BytesIO()
+        screenshot.save(buffer, format='PNG')
+        buffer.seek(0)
+        files["screenshot"] = ("screenshot.png", buffer, "image/png")
 
     try:
         response = requests.post(
             f"{API_REST_URL}/GameSessions",
             data=data,
-            files=files,
+            files=files if files else None,
             verify=get_resource_path('certs/apiRest.pem')
         )
         if response.status_code in [200, 201]:
-            messagebox.showinfo("Éxito", "Sesión registrada con captura correctamente.")
+            messagebox.showinfo("Éxito", "Sesión registrada correctamente.")
         else:
             messagebox.showerror("Error", f"Error al registrar sesión: {response.status_code}\n{response.text}")
     except Exception as e:
@@ -107,7 +103,7 @@ def enviar_sesion():
 # Crear ventana
 root = tk.Tk()
 root.title("RetroTrack - Logger de sesiones")
-root.geometry("450x400")
+root.geometry("450x450")
 
 label_title = tk.Label(root, text="Registrar Sesión de Juego", font=("Arial", 16))
 label_title.pack(pady=10)
@@ -139,6 +135,11 @@ label_hour = tk.Label(frame_form, text="Hora (HH:MM):")
 label_hour.grid(row=4, column=0, sticky="e")
 entry_hour = tk.Entry(frame_form, width=10)
 entry_hour.grid(row=4, column=1)
+
+# Checkbox para incluir screenshot
+send_screenshot_var = tk.BooleanVar(value=True)
+check_screenshot = tk.Checkbutton(root, text="Incluir captura de pantalla", variable=send_screenshot_var)
+check_screenshot.pack(pady=5)
 
 btn_submit = tk.Button(root, text="Enviar Sesión", command=enviar_sesion)
 btn_submit.pack(pady=20)
